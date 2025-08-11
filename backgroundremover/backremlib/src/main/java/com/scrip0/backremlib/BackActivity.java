@@ -36,6 +36,7 @@ import com.google.mediapipe.components.CameraXPreviewHelper;
 import com.google.mediapipe.components.ExternalTextureConverter;
 import com.google.mediapipe.framework.AndroidAssetUtil;
 import com.google.mediapipe.glutil.EglManager;
+import com.scrip0.backremlib.SafeCameraXPreviewHelper;
 
 import java.util.Timer;
 import java.util.TimerTask;
@@ -76,8 +77,9 @@ public class BackActivity {
     // consumed by {@link FrameProcessor} and the underlying MediaPipe graph.
     private ExternalTextureConverter converter;
 
-    // Handles camera access via the {@link CameraX} Jetpack support library.
-    private CameraXPreviewHelper cameraHelper;
+    // Handles camera access safaley via the {@link CameraX} Jetpack support library.
+    private SafeCameraXPreviewHelper cameraHelper;
+
 
     // Stores app context
     private final Context context;
@@ -381,7 +383,7 @@ public class BackActivity {
     }
 
     public void startCamera() {
-        cameraHelper = new CameraXPreviewHelper();
+        cameraHelper = new SafeCameraXPreviewHelper(this);
         previewFrameTexture = converter.getSurfaceTexture();
         cameraHelper.setOnCameraStartedListener(
                 surfaceTexture -> {
