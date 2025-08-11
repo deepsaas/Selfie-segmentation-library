@@ -152,11 +152,13 @@ public class BackActivity {
     }
 
     public void pause() {
-        converter.close();
-        // Hide preview display until we re-open the camera again.
+        if (converter != null) {
+            try { converter.close(); } catch (Throwable ignore) {}
+        }
         previewDisplayView.setVisibility(View.GONE);
         cleanTimer();
     }
+
 
     public void resume() {
         // Resume camera process
