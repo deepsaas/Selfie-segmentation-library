@@ -1,0 +1,4 @@
+jdk:
+  - openjdk11
+install:
+  - ./gradlew clean -Pgroup=com.github.deepsaas -Pversion=v1.0.2 -xtest -xlint :backremlib:publishToMavenLocal
