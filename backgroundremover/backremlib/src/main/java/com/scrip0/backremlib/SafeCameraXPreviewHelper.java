@@ -8,13 +8,11 @@ import androidx.annotation.Nullable;
 import com.google.mediapipe.components.CameraXPreviewHelper;
 
 /**
- * Replacement for MediaPipe's CameraXPreviewHelper focal-length calculation.
- * Some devices/external webcams report null/empty focal lengths -> NPE in MediaPipe.
- * We fall back to an estimated focal length in pixels using a conservative HFOV.
+ * Prevents NPE in MediaPipe when LENS_INFO_AVAILABLE_FOCAL_LENGTHS is null/empty
+ * (common on external webcams). Falls back to a sensible focal length estimate.
  */
 public class SafeCameraXPreviewHelper extends CameraXPreviewHelper {
 
-  // ~60° horizontal FOV is typical for many webcams/phones.
   private static final double DEFAULT_HORIZONTAL_FOV_DEGREES = 60.0;
 
   public SafeCameraXPreviewHelper(android.content.Context context) {
@@ -27,13 +25,32 @@ public class SafeCameraXPreviewHelper extends CameraXPreviewHelper {
       @Nullable Size sensorSizePx,
       @Nullable Rect activeArraySize) {
 
-    // If MediaPipe can compute it, let it.
     if (focalLengthsMm != null && focalLengthsMm.length > 0
         && sensorSizePx != null && sensorSizePx.getWidth() > 0) {
       try {
         return super.calculateFocalLengthInPixels(focalLengthsMm, sensorSizePx, activeArraySize);
       } catch (Throwable ignored) {
-        // fall through to safe estimate
+        // fall through
+      }
+    }
+
+    int widthPx = (sensorSizePx != null && sensorSizePx.getWidth() > 0)
+        ? sensorSizePx.getWidth()
+        : getFrameWidthOrFallback();
+
+    double fovRad = Math.toRadians(DEFAULT_HORIZONTAL_FOV_DEGREES);
+    double focalPx = 0.5 * widthPx / Math.tan(fovRad / 2.0);
+    return Math.max(1.0, focalPx);
+  }
+
+  private int getFrameWidthOrFallback() {
+    try {
+      Size s = getFrameSize();
+      if (s != null && s.getWidth() > 0) return s.getWidth();
+    } catch (Throwable ignored) {}
+    return 1080;
+  }
+}
       }
     }
 
