@@ -1,6 +1,5 @@
 package com.scrip0.backremlib;
 
-import android.content.Context;
 import android.graphics.Rect;
 import android.util.Size;
 
@@ -9,16 +8,16 @@ import androidx.annotation.Nullable;
 import com.google.mediapipe.components.CameraXPreviewHelper;
 
 /**
- * Replacement helper that avoids NPE when cameras (e.g., external webcams)
- * have no LENS_INFO_AVAILABLE_FOCAL_LENGTHS. If MediaPipe can compute a focal
- * length, we delegate to super; otherwise we estimate using a conservative FOV.
+ * Replacement for MediaPipe's CameraXPreviewHelper focal-length calculation.
+ * Some devices/external webcams report null/empty focal lengths -> NPE in MediaPipe.
+ * We fall back to an estimated focal length in pixels using a conservative HFOV.
  */
 public class SafeCameraXPreviewHelper extends CameraXPreviewHelper {
 
   // ~60° horizontal FOV is typical for many webcams/phones.
   private static final double DEFAULT_HORIZONTAL_FOV_DEGREES = 60.0;
 
-  public SafeCameraXPreviewHelper(Context context) {
+  public SafeCameraXPreviewHelper(android.content.Context context) {
     super(context);
   }
 
@@ -28,12 +27,34 @@ public class SafeCameraXPreviewHelper extends CameraXPreviewHelper {
       @Nullable Size sensorSizePx,
       @Nullable Rect activeArraySize) {
 
-    // If MediaPipe has enough metadata, use original behavior.
-    try {
-      if (focalLengthsMm != null && focalLengthsMm.length > 0
-          && sensorSizePx != null && sensorSizePx.getWidth() > 0) {
+    // If MediaPipe can compute it, let it.
+    if (focalLengthsMm != null && focalLengthsMm.length > 0
+        && sensorSizePx != null && sensorSizePx.getWidth() > 0) {
+      try {
         return super.calculateFocalLengthInPixels(focalLengthsMm, sensorSizePx, activeArraySize);
+      } catch (Throwable ignored) {
+        // fall through to safe estimate
       }
+    }
+
+    // Safe estimate: f(px) = 0.5 * width(px) / tan(HFOV/2)
+    int widthPx = (sensorSizePx != null && sensorSizePx.getWidth() > 0)
+        ? sensorSizePx.getWidth()
+        : getFrameWidthOrFallback();
+
+    double fovRad = Math.toRadians(DEFAULT_HORIZONTAL_FOV_DEGREES);
+    double focalPx = 0.5 * widthPx / Math.tan(fovRad / 2.0);
+    return Math.max(1.0, focalPx);
+  }
+
+  private int getFrameWidthOrFallback() {
+    try {
+      Size s = getFrameSize();
+      if (s != null && s.getWidth() > 0) return s.getWidth();
+    } catch (Throwable ignored) {}
+    return 1080; // reasonable portrait fallback
+  }
+}
     } catch (Throwable ignore) {
       // Fall through to safe estimate
     }
